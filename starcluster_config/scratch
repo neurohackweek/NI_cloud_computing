@@ -1,0 +1,12 @@
+'sha1:bc69b15747be:2208514453564704ca6c98c9b4871e6becaf1b3b'
+
+
+
+wget https://fcp-indi.s3.amazonaws.com/data/Projects/RocklandSample/RawDataBIDS/sub-A00028185/ses-NFB3/anat/sub-A00028185_ses-NFB3_T1w_skullstripped.nii.gz
+
+https://s3.amazonaws.com/fcp-indi/data/Projects/ABIDE_Initiative/Phenotypic_V1_0b_preprocessed1.csv
+
+# when you start the AMI, make sure that ports 22 (ssh), 443 (https), and 8888 are open
+
+
+starcluster -r us-east-1 createkey -o ~/.ssh/nhw16.rsa nhw16
