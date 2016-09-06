@@ -43,24 +43,24 @@ The head node is an inexpensive ```t2.medium``` on-demand instance. This node ca
 
 Rather than using X to communicate with the cluster, we will use jupyter. This is to make things a bit easier to understand. The head node should already be configured to open the neccesary ports, we just need to configure a password and certificate for jupyter notebook, and then start it up. I came up with these instructions from [here](http://blog.impiyush.me/2015/02/running-ipython-notebook-server-on-aws.html):
 
-1. Start ```ipython``` and run the following to create a password:
+Start ```ipython``` and run the following to create a password:
 
     from IPython.lib import passwd
     passwd()
 
 Copy the encoded password to a safe place, and then quite ipython.
 
-2. Create a certifacte using these commands in bash
+Create a certifacte using these commands in bash
 
     mkdir -p ~/certificates
     cd ~/certificates
     openssl req -x509 -nodes -days 365 -newkey rsa:1024 -keyout mycert.pem -out mycert.pem
 
-3. Create a jupyter server configuration file
+Create a jupyter server configuration file
 
     jupyter notebook --generate-config
 
-4. Copy the following lines to the top of the configuration file, replacing ecoded_password_string with the encoding string generated in step 1. 
+Copy the following lines to the top of the configuration file, replacing ecoded_password_string with the encoding string generated in step 1. 
 
     c = get_config()
     
@@ -75,15 +75,42 @@ Copy the encoded password to a safe place, and then quite ipython.
     # It is a good idea to put it on a known, fixed port
     c.NotebookApp.port = 8888
 
-5. start the notebook server
+Start the notebook server
 
-    jupyter notebook
-
-6. verify that you can connect using
+Verify that you can connect using
 
     http://EC2_DNS_NAME:8888
 
 You may need to accept the certificate, and then you can login using the password.
+
+## Run cluster demo in jupyter notebook
+
+Open another connection to AWS for debugging and other purposes
+
+    starcluster -c config sm -u ubuntu nhw16
+
+Clone the tutorial repo into the /home/ubuntu directory on the cluster.
+
+    cd /home/ubuntu
+    git clone https://github.com/neurohackweek/NI_cloud_computing.git
+
+In Jupyter navigate to ```abide_group_cluster.ipynb``` in the ```NI_cloud_computing``` directory.
+
+Go through the notebook, which at the end submits jobs to the queue. In the debug terminal query SGE to determine the state of your jobs:
+
+    qstat
+
+Since you do not have an compute nodes yet, only the head node, the jobs should be queued but not running. On your local system add 16 compute nodes (these will be spot instances) to the cluster
+
+    starcluster -c config -n 16 nhw16
+
+Once the nodes come up, you should see some action on the queue
+
+    qstat
+
+You can use the starcluster loadbalancer to monitor your job and remove nodes once they are completed.
+
+    starcluster -c config loadbalance -d -i 30 -m 20 -k 5 
 
 ## Other things
 - [Install x2go client](http://wiki.x2go.org/doku.php/download:start) to access your instance over using X windows and the [instructions here](http://fcp-indi.github.io/docs/user/cloud.html#x2go). *Note:* this requires special configuration that is available in the C-PAC and NHW16 AMIs. This probably will not work with other AMIs.
