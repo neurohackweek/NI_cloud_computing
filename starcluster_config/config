@@ -108,7 +108,7 @@ PUBLIC_IPS=True
 DISABLE_QUEUE=True
 # Uncomment to specify a different instance type for the master node (OPTIONAL)
 # (defaults to NODE_INSTANCE_TYPE if not specified)
-MASTER_INSTANCE_TYPE = t2.medium
+MASTER_INSTANCE_TYPE = m3.medium
 # Uncomment to specify a separate AMI to use for the master node. (OPTIONAL)
 # (defaults to NODE_IMAGE_ID if not specified)
 #MASTER_IMAGE_ID = ami-3393a45a (OPTIONAL)
