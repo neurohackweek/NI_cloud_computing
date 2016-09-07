@@ -35,7 +35,7 @@ You should now be ready to start the cluster head node, replacing clustername wi
 
 The ```-c config``` part of the command tells starcluster which config file to use, and is required with all calls to starcluster. This can be avoided by copying the config to ~/.starcluster/config, but otherwise just make sure to use the correct path to the config file.
 
-The ```-c smallcuster`` arguement passed to the ```start``` command indicates that you would like to start a cluster using the ```smallcluster``` template from the config file. This can be changed to refer to a custom template.
+The ```-c smallcuster``` arguement passed to the ```start``` command indicates that you would like to start a cluster using the ```smallcluster``` template from the config file. This can be changed to refer to a custom template.
 
 ```clustername``` at the end of the command indicates the cluster should be named clustername, and can be replaced with any name you like.
 
