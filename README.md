@@ -17,17 +17,19 @@ Install starcluster into the virtual environment:
 
 Now we configure starcluster. ```starcluster/config``` contains all of the information that we will need for executing the demo, except for your credentials. You can either edit the ```config``` file to include your credentials or you can use the ```set_keys.sh``` script as an example for setting your credentials in your environment. Which makes them a little more secure. AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY should have been provided to you. You can find AWS_USER_ID by logging into AWS, clicking on the down arrow next to your name in the top right-hand corner, and then choosing ```My Account```, the number you are looking for is labeled ```Account Id:```.
 
-To use starcluster, you will also need to generate keypairs that will be used to login to instances. you can do this by:
+To use starcluster, you will also need to generate keypairs that will be used to login to instances. you can do this by, replacing <keyname> with a unique string:
 
-     starcluster -r us-east-1 createkey -o ~/.ssh/nhw16.rsa nhw16
+     starcluster -r us-east-1 createkey -o ~/.ssh/<keyname>.rsa <keyname>
 
-If you choose a different path, or a different keyname (the nhw16 at the end of the command), you will need to update the config file replacing all key references containg nhw16 with the new keyname.
+You will need to update the config file replacing all key references containg nhw16 with the new keyname.
+
+If you want to use this as your default config file, you can copy it to ~/.starcluster/config. Otherwise you will need to specify the full path and filename for the config file each time you execute the starcluster command. In the following instructions ```<config_path>``` must be replaced with the path to the config file.
 
 ## Start cluster head node
 
-You should now be ready to start the cluster head node: 
+You should now be ready to start the cluster head node, replacing clustername with a unique name, you will need to use this for all starcluster commands: 
 
-    starcluster -c config start -c smallcluster nhw16
+    starcluster -c <configpath>/config start -c smallcluster <clustername>
 
 The ```-c config``` part of the command tells starcluster which config file to use, and is required with all calls to starcluster. This can be avoided by copying the config to ~/.starcluster/config, but otherwise just make sure to use the correct path to the config file.
 
@@ -39,9 +41,17 @@ The smallcluster template is configured to only start the head node by default. 
 
 The head node is an inexpensive ```t2.medium``` on-demand instance. This node cannot be interrupted by the AWS system, and can persist for multiple runs.
 
+## Logging into the cluster headnode
+
+You can connect to the cluster head node using the command ```sshmaster``` which is abbreviated as ```sm```. The ```-u``` flag specificies the username:
+
+    starcluster -c <configpath>/config sm -u ubuntu <clustername>
+
 ## Configure head node for jupyter notebook access
 
 Rather than using X to communicate with the cluster, we will use jupyter. This is to make things a bit easier to understand. The head node should already be configured to open the neccesary ports, we just need to configure a password and certificate for jupyter notebook, and then start it up. I came up with these instructions from [here](http://blog.impiyush.me/2015/02/running-ipython-notebook-server-on-aws.html):
+
+First login to the head node.
 
 Start ```ipython``` and run the following to create a password:
 
@@ -87,7 +97,7 @@ You may need to accept the certificate, and then you can login using the passwor
 
 Open another connection to AWS for debugging and other purposes
 
-    starcluster -c config sm -u ubuntu nhw16
+    starcluster -c <configpath>/config sm -u ubuntu <clustername>
 
 Clone the tutorial repo into the /home/ubuntu directory on the cluster.
 
@@ -100,9 +110,9 @@ Go through the notebook, which at the end submits jobs to the queue. In the debu
 
     qstat
 
-Since you do not have an compute nodes yet, only the head node, the jobs should be queued but not running. On your local system add 16 compute nodes (these will be spot instances) to the cluster
+Since you do not have an compute nodes yet, only the head node, the jobs should be queued but not running. On your local system add 16 compute nodes (these will be spot instances) to the cluster. This uses the ```addnode``` command, which is abbreviated ```an``` below:
 
-    starcluster -c config -n 16 nhw16
+    starcluster -c <configpath>/config an -n 16 <clustername>
 
 Once the nodes come up, you should see some action on the queue
 
@@ -110,7 +120,7 @@ Once the nodes come up, you should see some action on the queue
 
 You can use the starcluster loadbalancer to monitor your job and remove nodes once they are completed.
 
-    starcluster -c config loadbalance -d -i 30 -m 20 -k 5 
+    starcluster -c <configpath>/config loadbalance -d -i 30 -m 20 -k 5 <clustername>
 
 ## Other things
 - [Install x2go client](http://wiki.x2go.org/doku.php/download:start) to access your instance over using X windows and the [instructions here](http://fcp-indi.github.io/docs/user/cloud.html#x2go). *Note:* this requires special configuration that is available in the C-PAC and NHW16 AMIs. This probably will not work with other AMIs.

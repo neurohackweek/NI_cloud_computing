@@ -195,7 +195,7 @@ rando_out_prefix=os.path.join(working_dir,"_".join(["randomise"]+analysis+[args.
 print "writing results to %s"%(rando_out_prefix)
 
 ## now we should be ready to run randomize
-rando_string="randomise -i %s -o %s -d %s -t %s -m %s -n 10000 -D -T"%(merge_output, 
+rando_string="randomise -i %s -o %s -d %s -t %s -m %s -n 1000 -D -T"%(merge_output, 
     rando_out_prefix, mat_file, con_file, merge_mask_output)
 
 try:
