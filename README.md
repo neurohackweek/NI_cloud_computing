@@ -35,7 +35,7 @@ The ```-c config``` part of the command tells starcluster which config file to u
 
 The ```-c smallcuster`` arguement passed to the ```start``` command indicates that you would like to start a cluster using the ```smallcluster``` template from the config file. This can be changed to refer to a custom template.
 
-```nhw16``` at the end of the command indicates the cluster should be named nhw16, and can be replaced with any name you like.
+```clustername``` at the end of the command indicates the cluster should be named clustername, and can be replaced with any name you like.
 
 The smallcluster template is configured to only start the head node by default. We will add other nodes to the cluster after we have submitted jobs to be run.
 
