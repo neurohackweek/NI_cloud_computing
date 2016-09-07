@@ -17,13 +17,44 @@ Install starcluster into the virtual environment:
 
 ### Edit the config file
 
-Now we configure starcluster. ```starcluster/config``` contains all of the information that we will need for executing the demo, except for your credentials. You can either edit the ```config``` file to include your credentials or you can use the ```set_keys.sh``` script as an example for setting your credentials in your environment. Which makes them a little more secure. AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY should have been provided to you. You can find AWS_USER_ID by logging into AWS, clicking on the down arrow next to your name in the top right-hand corner, and then choosing ```My Account```, the number you are looking for is labeled ```Account Id:```.
+    #############################################
+    ## AWS Credentials and Connection Settings ##
+    #############################################
+    [aws info]
+    # This is the AWS credentials section (required).
+    # These settings apply to all clusters
+    # replace these with your AWS keys
+    AWS_ACCESS_KEY_ID = dummy #your_aws_access_key_id
+    AWS_SECRET_ACCESS_KEY = dummy #your_secret_access_key
+    # replace this with your account number
+    AWS_USER_ID= dummy #your userid
+    
+Now we configure starcluster. ```starcluster/config``` contains all of the information that we will need for executing the demo, except for your credentials. You can either edit the ```config``` file to include your credentials or you can use the ```set_keys.sh``` script as an example for setting your credentials in your environment. Which makes them a little more secure. ```AWS_ACCESS_KEY_ID``` and ```AWS_SECRET_ACCESS_KEY``` should have been provided to you. You can find ```AWS_USER_ID``` by logging into AWS, clicking on the down arrow next to your name in the top right-hand corner, and then choosing ```My Account```, the number you are looking for is labeled ```Account Id:```.
 
 To use starcluster, you will also need to generate keypairs that will be used to login to instances. you can do this by, replacing <keyname> with a unique string:
 
      starcluster -r us-east-1 createkey -o ~/.ssh/<keyname>.rsa <keyname>
 
-*You will need to update the config file replacing all key references containg nhw16 with the new keyname*.
+*You will need to update the config file replacing all key references containing ```replace_ssh_key``` with the new keyname*. 
+
+Specifically this must be done in lines 43-50:
+
+    ###########################
+    ## Defining EC2 Keypairs ##
+    ###########################
+    # Sections starting with "key" define your keypairs. See "starcluster createkey
+    # --help" for instructions on how to create a new keypair. Section name should
+    # match your key name e.g.:
+    [key replace_ssh_key]
+    KEY_LOCATION=~/.ssh/replace_ssh_key.rsa
+
+and on line 75:
+
+    [cluster smallcluster]
+    # change this to the name of one of the keypair sections defined above
+    KEYNAME = replace_ssh_key
+
+### Note about config files
 
 If you want to use this as your default config file, you can copy it to ~/.starcluster/config. Otherwise you will need to specify the full path and filename for the config file each time you execute the starcluster command. In the following instructions ```<config_path>``` must be replaced with the path to the config file.
 
