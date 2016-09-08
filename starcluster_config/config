@@ -46,8 +46,8 @@ AWS_USER_ID= dummy #your userid
 # Sections starting with "key" define your keypairs. See "starcluster createkey
 # --help" for instructions on how to create a new keypair. Section name should
 # match your key name e.g.:
-[key nhw16]
-KEY_LOCATION=~/.ssh/nhw16.rsa
+[key cckey_nhw16]
+KEY_LOCATION=~/.ssh/cckey_nhw16.rsa
 
 # You can of course have multiple keypair sections
 # [key myotherkey]
@@ -72,7 +72,7 @@ KEY_LOCATION=~/.ssh/nhw16.rsa
 
 [cluster smallcluster]
 # change this to the name of one of the keypair sections defined above
-KEYNAME = nhw16
+KEYNAME = cckey_nhw16
 # number of ec2 instances to launch
 CLUSTER_SIZE = 1
 # create the following user on the cluster
@@ -93,7 +93,7 @@ CLUSTER_SHELL = bash
 NODE_IMAGE_ID = ami-1813660f
 # instance type for all cluster nodes
 # (options: m3.large, r3.4xlarge, m3.2xlarge, cr1.8xlarge, c4.8xlarge, c4.xlarge, i2.8xlarge, d2.4xlarge, d2.8xlarge, c4.4xlarge, c1.xlarge, g2.2xlarge, c4.2xlarge, t2.small, cc1.4xlarge, i2.xlarge, m3.medium, r3.xlarge, c3.large, i2.4xlarge, m3.xlarge, d2.2xlarge, g2.8xlarge, cg1.4xlarge, m1.small, c1.medium, r3.2xlarge, t1.micro, c3.2xlarge, c3.xlarge, m1.large, hs1.8xlarge, c3.8xlarge, c3.4xlarge, t2.medium, hi1.4xlarge, t2.micro, m2.2xlarge, d2.xlarge, m1.xlarge, m2.xlarge, m1.medium, r3.large, cc2.8xlarge, c4.large, i2.2xlarge, r3.8xlarge, m4.10xlarge, m2.4xlarge)
-NODE_INSTANCE_TYPE = m3.medium
+NODE_INSTANCE_TYPE = m3.xlarge
 # Launch cluster in a VPC subnet (OPTIONAL)
 #SUBNET_ID=subnet-e985959e
 # Uncomment to assign public IPs to cluster nodes (VPC-ONLY) (OPTIONAL)
@@ -108,7 +108,7 @@ PUBLIC_IPS=True
 DISABLE_QUEUE=True
 # Uncomment to specify a different instance type for the master node (OPTIONAL)
 # (defaults to NODE_INSTANCE_TYPE if not specified)
-MASTER_INSTANCE_TYPE = m3.medium
+MASTER_INSTANCE_TYPE = m3.xlarge
 # Uncomment to specify a separate AMI to use for the master node. (OPTIONAL)
 # (defaults to NODE_IMAGE_ID if not specified)
 #MASTER_IMAGE_ID = ami-3393a45a (OPTIONAL)
