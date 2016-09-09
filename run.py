@@ -9,200 +9,175 @@ import commands
 import shutil
 from create_flame_model_files import create_flame_model_files
 import glob
+import json
+import numpy as np
 #import nibabel
 #import numpy
 #from glob import glob
 
-
-pipes=['ccs','cpac','dparsf','niak']
-strats=['filt_global','filt_noglobal','nofilt_global','nofilt_noglobal']
-derivatives=['alff','degree_binarize','degree_weighted','eigenvector_binarize',
-    'eigenvector_weighted','falff','func_mean','lfcd','reho','vmhc']
-
-def run(command, env={}):
-    process = Popen(command, stdout=PIPE, stderr=subprocess.STDOUT,
-        shell=True, env=env)
-    while True:
-        line = process.stdout.readline()
-        line = str(line, 'utf-8')[:-1]
-        print(line)
-        if line == '' and process.poll() != None:
-            break
-
+__version__ = 0.1
+ 
 parser = argparse.ArgumentParser(description='ABIDE Group Analysis Runner')
-parser.add_argument('pheno_file', help='File containing the participant'
-    'information for the analysis that will be run. This is a CSV with the'
-    'participant id in the first column, the dependent variable in the'
-    'second column and the remaining columns contain regressors of no interest.')
-parser.add_argument('output_dir', help='The directory where the output files '
-    'should be stored. If you are running group level analysis '
-    'this folder should be prepopulated with the results of the'
-    'participant level analysis.')
-parser.add_argument('working_dir', help='The directory to use for intermediate files.')
-parser.add_argument('derivative', help='a string corresponding to the derivatives'
-    'that can be run. Possible values include:%s'%(", ".join(derivatives)), 
-    default="reho")
-parser.add_argument('analysis_id', help='A number corresponding to the'
-    'ABIDE preprocessing that should be run, 0 <= n <= 15', default="1")
 
-# get the command line arguments
+parser.add_argument('bids_dir', help='The directory with the input dataset '
+                    'formatted according to the BIDS standard.')
+parser.add_argument('output_dir', help='The directory where the output files '
+                    'should be stored. If you are running group level analysis '
+                    'this folder should be prepopulated with the results of the'
+                    'participant level analysis.')
+parser.add_argument('working_dir', help='The directory where intermediary files '
+                    'are stored while working ont them.')
+parser.add_argument('analysis_level', help='Level of the analysis that will be performed. '
+                    'Multiple participant level analyses can be run independently '
+                    '(in parallel) using the same output_dir.',
+                    choices=['participant', 'group'])
+parser.add_argument('model_file', help='JSON file describing the model and contrasts'
+                    'that should be.')
+parser.add_argument('--participant_label', help='The label(s) of the participant(s) that should be analyzed. The label '
+                   'corresponds to sub-<participant_label> from the BIDS spec '
+                   '(so it does not include "sub-"). If this parameter is not '
+                   'provided all subjects should be analyzed. Multiple '
+                   'participants can be specified with a space separated list.',
+                   nargs="+")
+parser.add_argument('-v', '--version', action='version',
+                    version='BIDS-App example version {}'.format(__version__))
+                    
+
 args = parser.parse_args()
 
-# Go through and check all of the arguments and decode them
-analysis_id=int(args.analysis_id)
-if analysis_id > 15 or analysis_id < 0:
-    raise Exception("analysis id %d is out of range 0 <= n <= 16"%(analysis_id))
 
-analysis = [pipes[analysis_id/4], strats[analysis_id%4]]
-
-if args.derivative not in derivatives:
-    print("Invalid derivative %s, valid options are %s"%(
-        args.derivative,", ".join(derivatives)))
+model_file=args.model_file
+if not os.path.isfile(model_file):
+    print("Could not find model file %s"%(model_file))
     sys.exit(1)
-
-pheno_file=args.pheno_file
-if not os.path.isfile(pheno_file):
-    print("Could not find pheno file %s"%(pheno_file))
-    sys.exit(1)
-
 
 output_dir=args.output_dir.rstrip('/')
 if not os.path.isdir(output_dir):
     print("Could not find output directory %s"%(output_dir))
     sys.exit(1)
 
-output_dir=os.path.join(output_dir,"_".join(analysis+[args.derivative]))
-if not os.path.isdir(output_dir):
-    os.makedirs(output_dir)
-
 working_dir=args.working_dir.rstrip('/')
 if not os.path.isdir(working_dir):
     print("Could not find working directory %s"%(working_dir))
     sys.exit(1)
 
-working_dir=os.path.join(working_dir,"_".join(analysis+[args.derivative]))
+bids_dir=args.bids_dir.rstrip('/')
 if not os.path.isdir(working_dir):
-    os.makedirs(working_dir)
-
-if output_dir == working_dir:
-    print("Cannot use same directory for output and working directory")
+    print("Could not find bids directory %s"%(bids_dir))
     sys.exit(1)
 
-print ("#### Running ABIDE group analysis #%d"%(analysis_id))
-print ("Derivatives being analysed (pipeline::strat): %s"
-    %("::".join(analysis)))
+print ("## Running randomize pipeline with parameters:")
+print ("Output directory: %s"%(bids_dir))
 print ("Output directory: %s"%(output_dir))
 print ("Working directory: %s"%(working_dir))
-print ("Pheno file: %s"%(args.pheno_file))
-print ("Derivative: %s"%(args.derivative))
+print ("Pheno file: %s"%(args.model_file))
+print ("\n\n")
 
 # read in the pheno file
-pheno_df=pd.read_csv(pheno_file)
-print pheno_df.head()
+pheno_df=pd.read_csv(os.path.join(bids_dir, 'participants.tsv'),sep='\t')
+#print pheno_df.head()
 
-# add in a column that will be used to indicate dl errors
-pheno_df["dl_error"] = False
-pheno_df["local_file"] = pheno_df["FILE_ID"]
+# go through data, verify that we can find a corresponding entry in
+# the pheno file, and keep track of the indices so that we can 
+# reorder the pheno to correspond
+file_list=[]
+pheno_key_list=[]
+for root, dirs, files in os.walk(bids_dir):
+    for filename in files:
+        if not filename.endswith(".nii.gz"):
+            continue
+        f_chunks = (filename.split(".")[0]).split("_")
+        # make a dictionary from the key-value chunks
+        f_dict = {chunk.split("-")[0]:"-".join(chunk.split("-")[1:]) for chunk in f_chunks[:-1]}
+        file_list.append(os.path.join(root,filename))
+        pheno_key_list.append(pheno_df[(pheno_df["participant_id"]=="-".join(["sub",f_dict["sub"]]))].index.tolist()[0])
 
-# configure out download string
-template_str="https://s3.amazonaws.com/fcp-indi/data/Projects/ABIDE_Initiative/Outputs/[pipeline]/[strategy]/[derivative]/[file identifier]_[derivative].nii.gz"
+# merge the fines into 4D
+merge_input = " ".join(file_list)
+merge_output = os.path.join(working_dir,"rando_pipe") + "_merge.nii.gz"
 
-# set the values that can be set
-template_str=template_str.replace('[derivative]',args.derivative)
-template_str=template_str.replace('[pipeline]',analysis[0])
-template_str=template_str.replace('[strategy]',analysis[1])
-
-# go through and download the data
-for file_id in pheno_df["FILE_ID"]:
-    data_str = template_str.replace('[file identifier]',file_id)
-    local_file = os.path.join(working_dir,os.path.basename(data_str))
-
-    # if the file already exists, we can skip the download
-    if not os.path.isfile(local_file):
-        # now download the file
-        try:
-            urllib.urlretrieve(data_str, local_file)
-        except Exception as e:
-            print "Could not download %s"%(data_str)
-            pheno_df.loc[pheno_df["FILE_ID"]==file_id,"dl_error"]=True
-    
-    pheno_df.loc[pheno_df["FILE_ID"]==file_id,"local_file"]=local_file
-    print data_str, local_file
-
-# exclude the files that did not download from further anlaysis
-pheno_df = pheno_df[pheno_df["dl_error"]==False]
-
-# make an output file prefix
-outfile_prefix=os.path.join(working_dir,"_".join(analysis))
-
-# mrege the fines into 4D
-merge_input = " ".join(pheno_df["local_file"])
-merge_output = outfile_prefix + "_merge.nii.gz"
+print "merging",merge_output
 
 if not os.path.isfile(merge_output):
     # next we create a 4D file for the analysis using fsl merge
     merge_string = "fslmerge -t %s %s" % (merge_output, merge_input)
     
     # MERGE the outputs
-    try:
-        commands.getoutput(merge_string)
-    except Exception as e:
-        print "[!] FSL Merge failed for output: %s" % merge_output
-        print "Error details: %s\n\n" % e
+    res=commands.getoutput(merge_string)
+    if len(res)>0 and res[0] != 0:
+        print "[!] FSL Merge failed for output: %s" % res[1]
+        print res
         raise
+else:
+    print "%s already exists, skipping merge"%(merge_output)
 
 # now create a mask for the analysis
-merge_mask_output = outfile_prefix+"_mask.nii.gz"
+merge_mask_output = os.path.join(working_dir,"rando_pipe")+"_mask.nii.gz"
 
+print "Masking",merge_mask_output
 if not os.path.isfile(merge_mask_output):
     merge_mask_string = "fslmaths %s -abs -Tmin -bin %s" % (merge_output, merge_mask_output)
     
     # CREATE A MASK of the merged file
-    try:
-        commands.getoutput(merge_mask_string)
-    except Exception as e:
-        print "[!] CPAC says: FSL Mask failed for output: %s" % merge_mask_output
-        print "Error details: %s\n\n" % e
+    res=commands.getoutput(merge_mask_string)
+    if len(res)>0 and res[0] != 0:
+        print "[!] FSL Mask failed for output: %s" % res[1]
+        print res
         raise
 
 #### now create the design.mat file
 
+# reduce to the rows that we are using, and reorder to match the file list
+pheno_df=pheno_df.iloc[pheno_key_list,:]
+
+print file_list[0:5]
+print pheno_df.head()
+
+
+# load in the model 
+with open(model_file) as model_fd:    
+    model_dict = json.load(model_fd)
+
+incols=model_dict["model"].replace("-1","").replace("-","+").split("+")
+
 # reduce the file to just the columns that we are interested in
-pheno_df=pheno_df[["SITE_ID","DX_GROUP","AGE_AT_SCAN"]]
-pheno_df["AGE_AT_SCAN"]=pheno_df["AGE_AT_SCAN"]-pheno_df["AGE_AT_SCAN"].mean()
-pheno_df.loc[pheno_df["DX_GROUP"]==1,"DX_GROUP"]="ASD"
-pheno_df.loc[pheno_df["DX_GROUP"]==2,"DX_GROUP"]="TDC"
-num_subjects = pheno_df.shape[0]
+pheno_df=pheno_df[incols]
+
+#de mean all numberic columns
+for df_ndx in pheno_df.columns:
+    if np.issubdtype(pheno_df[df_ndx].dtype,np.number):
+        pheno_df[df_ndx]-=pheno_df[df_ndx].mean()
+    print df_ndx
 
 # use patsy to create the design matrix
-design=patsy.dmatrix("DX_GROUP+SITE_ID+AGE_AT_SCAN-1",pheno_df)
+design=patsy.dmatrix(model_dict["model"],pheno_df)
 column_names = design.design_info.column_names
+print column_names
 
 # create contrasts
-contrast_dict={
-    "DX_GROUP[ASD]-DX_GROUP[TDC]":design.design_info.linear_constraint("DX_GROUP[ASD]-DX_GROUP[TDC]").coefs[0],
-    "DX_GROUP[TDC]-DX_GROUP[ASD]":design.design_info.linear_constraint("DX_GROUP[TDC]-DX_GROUP[ASD]").coefs[0],
-    }
+contrast_dict={}
+for k in model_dict["contrasts"]:
+    print k
+    contrast_dict[k]=design.design_info.linear_constraint(k.encode('ascii')).coefs[0]
+
+num_subjects=len(file_list)
 
 mat_file, grp_file, con_file, fts_file = create_flame_model_files(design, \
     column_names, contrast_dict, None, [], None, [1] * num_subjects, "Treatment", \
-    "_".join(analysis+[args.derivative]), args.derivative, working_dir)
+    "repro_pipe_model", [], working_dir)
 
-print mat_file, grp_file, con_file, fts_file
-
-rando_out_prefix=os.path.join(working_dir,"_".join(["randomise"]+analysis+[args.derivative]))
+rando_out_prefix=os.path.join(working_dir,"rando_pipe")
 
 print "writing results to %s"%(rando_out_prefix)
 
 ## now we should be ready to run randomize
-rando_string="randomise -i %s -o %s -d %s -t %s -m %s -n 1000 -D -T"%(merge_output, 
+rando_string="randomise -i %s -o %s -d %s -t %s -m %s -n 10 -D -T"%(merge_output, 
     rando_out_prefix, mat_file, con_file, merge_mask_output)
 
-try:
-    commands.getoutput(rando_string)
-except Exception as e:
+res=commands.getoutput(rando_string)
+if len(res)>0 and res[0] != 0:
     print "[!] FSL randomise failed."
-    print "Error details: %s\n\n" % e
+    print res
     raise
 
 # ## now do the clustering stuff
@@ -212,11 +187,10 @@ for i in range(1,3):
     thresh_string="fslmaths %s_tfce_corrp_tstat%d -thr 0.95 -bin -mul %s_tstat%d %s_thresh_tstat1"%(
         rando_out_prefix,i,rando_out_prefix,i,rando_out_prefix)
 
-    try:
-        commands.getoutput(thresh_string)
-    except Exception as e:
-        print "[!] fslmaths failed."
-        print "Error details: %s\n\n" % e
+    res=commands.getoutput(thresh_string)
+    if len(res)>0 and res[0] != 0:
+        print "[!] FSL fslmaths thresh failed."
+        print res
         raise
 
 
@@ -225,14 +199,12 @@ for i in range(1,3):
     clust_string="cluster --in=%s_thresh_tstat%d --thresh=0.0001 --oindex=%s_cluster_index --olmax=%s_lmax.txt --osize=%s_cluster_size"%(
         rando_out_prefix, i, rando_out_prefix, rando_out_prefix, rando_out_prefix)
     
-    try:
-        commands.getoutput(clust_string)
-    except Exception as e:
-        print "[!] cluster failed."
-        print "Error details: %s\n\n" % e
+    res=commands.getoutput(clust_string)
+    if len(res)>0 and res[0] != 0:
+        print "[!] FSL cluster failed."
+        print res
         raise
 
 ## copy results to the output directory
 for f in glob.glob(rando_out_prefix+"*"):
     shutil.copy(f,output_dir)
-
