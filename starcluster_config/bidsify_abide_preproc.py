@@ -48,32 +48,34 @@ derivatives={'rois_tt':['timeseries','TT'],
 for strat in strats:
     for pipeline in pipes:
         pipe_str="_".join([pipeline,strat])
-        for derivative in derivatives:
+        for derivative,deriv_lbls in derivatives.items():
             deriv_len=len(derivative.split("_"))
             out_derive=derivative.replace("_","-")
             deriv_prefix=os.path.join('data/Projects/ABIDE_Initiative/Outputs',pipeline,strat,derivative)
-            print deriv_prefix
+            print "iterationg through %s:%s:%s"%(pipeline,strat,derivative)
             derive_objs=bucket.objects.filter(Prefix=deriv_prefix).all()
             for from_obj in derive_objs:
-                out_key=from_obj.key.replace(strat_prefix,'')
+                out_key=from_obj.key.replace(deriv_prefix,'')
                 out_key=out_key.lstrip('/')
-                (d,filename)=out_key.split('/')
-                fvals=filename.split('_')
+                fvals=out_key.split('_')
                 pt_str=''
                 if len(fvals) - deriv_len > 2:
-                    pt_str='sub-%s'%("-".join([''.join(fvals[0:2]),fvals[2]]))
+                    pt_str='sub-%s'%("".join([''.join(fvals[0:2]),fvals[2]]))
                 else:
-                    pt_str='sub-%s'%("-".join([fvals[0],fvals[1]]))
+                    pt_str='sub-%s'%("".join([fvals[0],fvals[1]]))
                 ext='.'.join((fvals[-1].split('.'))[1:])
-                fname='_'.join([pt_str,'sess-1',out_derive])
+                fname='_'.join([pt_str,'ses-1'])
+                if deriv_lbls[1] != '':
+                    fname='_'.join([fname,'-'.join(['variant',deriv_lbls[1]])])
+                fname='_'.join([fname,deriv_lbls[0]])                
                 fname='.'.join([fname,ext])
                 outkey=os.path.join('data/Projects/ABIDE_Initiative/Derivatives',pipe_str,
-                                    pt_str,'sess-1','func',fname)
-                print from_obj.key
-                print outkey
+                                    pt_str,'ses-1','func',fname)
+                #print from_obj.key
+                #print outkey
                 s3.copy({"Bucket": bucket_name, "Key": from_obj.key}, bucket_name, outkey)
                 #break
-            break
-        break
-    break
+            #break
+        #break
+    #break
 
