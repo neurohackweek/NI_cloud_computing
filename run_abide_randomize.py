@@ -11,6 +11,19 @@ import pandas as pd
 import json
 
 
+sge_template = \
+'''#! %(shell)s
+## SGE batch file - %(timestamp)s
+#$ -S %(shell)s
+#$ -N %(job_name)s
+#$ -t 1-%(num_tasks)d
+#$ -V
+#$ -wd %(work_dir)s
+echo "Start - TASKID " %(env_arr_idx)s " : " $(date)
+%(run_cmd)s
+echo "End - TASKID " %(env_arr_idx)s " : " $(date)
+'''
+
 pheno_file_url = "https://s3.amazonaws.com/fcp-indi/data/Projects/" + \
                  "ABIDE_Initiative/Phenotypic_V1_0b_preprocessed1.csv"
 pheno_file_local = "Phenotypic_V1_0b_preprocessed1.csv"
@@ -53,16 +66,17 @@ timestamp = str(time.strftime("%Y_%m_%d_%H_%M_%S"))
 
 strats = ['nofilt_global']  # , 'nofilt_noglobal', 'filt_global', 'filt_noglobal']
 pipes = ['cpac']  # , 'dparsf', 'niak', 'ccs']
-derivatives = {'reho': ['reho', ''],
-               'lfcd': ['lfcd', ''],
-               'func_mean': ['mean', ''],
-               'falff': ['falff', ''],
-               'eigenvector_weighted': ['ecw', ''],
-               'eigenvector_binarize': ['ecb', ''],
-               'degree_weighted': ['dcw', ''],
-               'degree_binarize': ['dcb', ''],
-               'alff': ['alff', ''],
-               'vmhc': ['vmhc', '']}
+derivatives = { 'degree_binarize': ['dcb', '']}
+#derivatives = {'reho': ['reho', ''],
+               #'lfcd': ['lfcd', ''],
+               #'func_mean': ['mean', ''],
+               #'falff': ['falff', ''],
+               #'eigenvector_weighted': ['ecw', ''],
+               #'eigenvector_binarize': ['ecb', ''],
+               #'degree_weighted': ['dcw', ''],
+               #'degree_binarize': ['dcb', ''],
+               #'alff': ['alff', ''],
+               #'vmhc': ['vmhc', '']}
 
 # ABIDE preproc DL template
 abide_dl_link = "https://fcp-indi.s3.amazonaws.com/data/Projects/ABIDE_Initiative" + \
@@ -86,7 +100,7 @@ if not os.path.isdir(cluster_files_dir):
 for strat in strats:
     for pipe in pipes:
         for (deriv, deriv_vals) in derivatives.items():
-            
+           
             # make the input, output, and clusterlog directories for this processing
             deriv_in_dir = os.path.join(inputs_dir, '_'.join([pipe, strat]), deriv)
             if not os.path.isdir(deriv_in_dir):
@@ -99,7 +113,7 @@ for strat in strats:
             deriv_log_dir = os.path.join(cluster_files_dir, '_'.join([pipe, strat]), deriv)
             if not os.path.isdir(deriv_log_dir):
                 os.makedirs(deriv_log_dir)
-
+            
             dl_ndx=[]
             for (ndx,row) in pheno_df.iterrows():
                 data_dl_config = dict(pipe_str='_'.join([pipe, strat]),
@@ -131,51 +145,39 @@ for strat in strats:
             with open(os.path.join(deriv_in_dir,'model.json'), 'w') as outfile:
                 json.dump(model_desc, outfile)
 
-            break
+            # Batch file variables
+            shell = commands.getoutput('echo $SHELL')
 
-exit(0)
+            confirm_str = '(?<=Your job-array )\d+'
+            exec_cmd = 'qsub'
 
-# Batch file variables
-shell = commands.getoutput('echo $SHELL')
+            run_str = "docker run -v %s:/bids_in -v %s:/bids_out bids/randomise:latest /bids_in /bids_out /tmp group /bids_in/model.json"%(deriv_in_dir,deriv_out_dir)
 
-sge_template = \
-    '''#! %(shell)s
-## SGE batch file - %(timestamp)s
-#$ -S %(shell)s
-#$ -N %(job_name)s
-#$ -t 1-%(num_tasks)d
-#$ -V
-#$ -wd %(work_dir)s
-echo "Start - TASKID " %(env_arr_idx)s " : " $(date)
-%(run_cmd)s
-echo "End - TASKID " %(env_arr_idx)s " : " $(date)
-'''
-confirm_str = '(?<=Your job-array )\d+'
-exec_cmd = 'qsub'
+            print "submitting: ",run_str
 
 # Set up config dictionary
-config_dict = {'timestamp': timestamp,
+            config_dict = {'timestamp': timestamp,
                'shell': shell,
                'job_name': 'run_example',
-               'num_tasks': 16,
+               'num_tasks': 1,
                'work_dir': cluster_files_dir,
                'env_arr_idx': '$SGE_TASK_ID',
-               'run_cmd': '/home/ubuntu/NI_cloud_computing/run.py /home/ubuntu/NI_cloud_computing/abide_analy_pheno.csv /home/ubuntu/NI_cloud_computing /tmp reho $SGE_TASK_ID'
+               'run_cmd': run_str
                }
 
-batch_file_contents = sge_template % config_dict
+            batch_file_contents = sge_template % config_dict
 
-batch_filepath = '/home/ubuntu/NI_cloud_computing/cluster_run.sge'
-with open(batch_filepath, "w") as outfd:
-    outfd.write(batch_file_contents)
+            batch_filepath = '/home/ubuntu/NI_cloud_computing/cluster_run.sge'
+            with open(batch_filepath, "w") as outfd:
+                outfd.write(batch_file_contents)
 
-import re
+            import re
 
-# Get output response from job submission
-out = commands.getoutput('%s %s' % (exec_cmd, batch_filepath))
+            # Get output response from job submission
+            out = commands.getoutput('%s %s' % (exec_cmd, batch_filepath))
 
-# Check for successful qsub submission
-if re.search(confirm_str, out) == None:
-    err_msg = 'Error submitting %s run to sge queue' % \
-              (config_dict['job_name'])
-    raise Exception(err_msg)
+            # Check for successful qsub submission
+            if re.search(confirm_str, out) == None:
+                err_msg = 'Error submitting %s run to sge queue' % \
+                          (config_dict['job_name'])
+                raise Exception(err_msg)
