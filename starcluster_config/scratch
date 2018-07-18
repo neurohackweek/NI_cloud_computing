@@ -1,4 +1,10 @@
-'sha1:bc69b15747be:2208514453564704ca6c98c9b4871e6becaf1b3b'
+
+- [install x2go client](http://wiki.x2go.org/doku.php/download:start) to access your instance over using X windows
+- [install cyberduck](https://cyberduck.io/?l=en) to browse the 
+
+
+
+
 
 
 
@@ -10,3 +16,4 @@ https://s3.amazonaws.com/fcp-indi/data/Projects/ABIDE_Initiative/Phenotypic_V1_0
 
 
 starcluster -r us-east-1 createkey -o ~/.ssh/nhw16.rsa nhw16
+
